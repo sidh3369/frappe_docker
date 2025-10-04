@@ -9,6 +9,8 @@ COPY . .
 # Install bench if not already installed
 RUN pip install frappe-bench
 
+RUN rm -rf frappe-bench
+
 # Initialize bench (if not already present)
 RUN bench init frappe-bench --skip-assets --frappe-branch version-14
 

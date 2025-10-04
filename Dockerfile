@@ -6,10 +6,14 @@ COPY . .
 
 RUN pip install --user frappe-bench
 
-# Add bench to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
-# Initialize bench (this creates frappe-bench)
+# Remove any existing bench folder with permission escalation
+USER root
+RUN rm -rf /home/frappe/frappe-bench
+USER frappe
+
+# Initialize bench (creates frappe-bench)
 RUN bench init frappe-bench --skip-assets --frappe-branch version-14
 
 WORKDIR /home/frappe/frappe-bench

@@ -8,26 +8,16 @@ RUN pip install --user frappe-bench
 
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
-# Remove any existing bench folder with permission escalation
-USER root
-RUN rm -rf /home/frappe/frappe-bench
-USER frappe
+RUN apt-get update && apt-get install -y redis-server
 
-# Initialize bench (creates frappe-bench)
 RUN bench init frappe-bench --skip-assets --frappe-branch version-14
 
 WORKDIR /home/frappe/frappe-bench
 
-# Get the HRMS app
 RUN bench get-app --branch develop https://github.com/frappe/hrms
 
-# Create a site
-RUN bench new-site site1.local \
-    --admin-password admin \
-    --mariadb-root-password root \
-    --no-mariadb-socket
+RUN bench new-site site1.local --admin-password admin --mariadb-root-password root --no-mariadb-socket
 
-# Install the app
 RUN bench --site site1.local install-app hrms
 
 EXPOSE 8000

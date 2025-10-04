@@ -10,7 +10,7 @@ COPY . .
 RUN pip install frappe-bench
 
 # Remove old bench folder if it exists
-RUN rm -rf frappe-bench
+RUN rm -rf /home/frappe/frappe-bench || true
 
 # Create a fresh folder for bench
 RUN mkdir -p frappe-bench

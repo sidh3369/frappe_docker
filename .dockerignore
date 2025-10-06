@@ -9,3 +9,9 @@ sites
 __pycache__/
 node_modules/
 dist/
+frappe-bench
+sites
+.env
+node_modules
+__pycache__/
+*.pyc

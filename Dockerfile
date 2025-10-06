@@ -1,70 +1,68 @@
-# Dockerfile — fixed for bench init (adds cron, redis, mysql libs, etc.)
-FROM frappe/erpnext-worker:latest
+# ------------------------------------------------------------
+# ✅ Frappe + ERPNext + HRMS Dockerfile (with Node.js 20 fix)
+# ------------------------------------------------------------
 
-# use root for system installs
-USER root
+FROM python:3.10-slim
 
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Kolkata
 
-# Install system packages required by bench/erpnext
-# - cron provides /usr/bin/crontab (fixes your error)
-# - redis-server needed by bench init
-# - git, build-essential, python3-venv, python3-pip for building
-# - default-libmysqlclient-dev / libmariadb-dev-* for MySQL/MariaDB Python bindings
-# - mariadb-client for client-side DB operations (bench new-site may use it)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cron \
-      redis-server \
-      git \
-      curl \
-      build-essential \
-      python3-venv \
-      python3-pip \
-      default-libmysqlclient-dev \
-      libmariadb-dev-compat \
-      libmariadb-dev \
-      mariadb-client \
-      locales && \
-    rm -rf /var/lib/apt/lists/*
+# ------------------------------------------------------------
+# 1️⃣ Install base dependencies
+# ------------------------------------------------------------
+RUN apt-get update && apt-get install -y \
+    git curl wget vim gnupg2 ca-certificates \
+    build-essential mariadb-client redis-server \
+    python3-dev python3-pip python3-setuptools python3-venv \
+    && rm -rf /var/lib/apt/lists/*
 
-# Ensure /home/frappe exists and correct owner
-RUN mkdir -p /home/frappe && chown -R frappe:frappe /home/frappe
+# ------------------------------------------------------------
+# 2️⃣ Install Node.js 20 + Yarn (important for HRMS)
+# ------------------------------------------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g yarn && \
+    node -v && yarn -v
 
-# Remove any existing incomplete bench folder (do as root)
-RUN rm -rf /home/frappe/frappe-bench || true
+# ------------------------------------------------------------
+# 3️⃣ Install Bench (Frappe CLI)
+# ------------------------------------------------------------
+RUN pip install --upgrade pip && pip install frappe-bench
 
-# switch to frappe user for bench operations
-USER frappe
+# ------------------------------------------------------------
+# 4️⃣ Initialize new bench
+# ------------------------------------------------------------
 WORKDIR /home/frappe
+RUN bench init frappe-bench --frappe-branch version-16 --python python3
 
-# Put user-local pip bin folder into PATH so bench/honcho are found
-ENV PATH="/home/frappe/.local/bin:${PATH}"
-
-# Install bench into the user's local bin
-RUN pip install --user --no-cache-dir frappe-bench
-
-# Initialize bench; bench will create /home/frappe/frappe-bench
-# NOTE: skip-assets speeds up init; change branch if you need other version
-RUN bench init frappe-bench --skip-assets --frappe-branch version-14
-
+# ------------------------------------------------------------
+# 5️⃣ Set working directory
+# ------------------------------------------------------------
 WORKDIR /home/frappe/frappe-bench
 
-# Get HRMS app and install site
-# (You may want to replace site name and passwords with env vars in production)
+# ------------------------------------------------------------
+# 6️⃣ Get ERPNext app
+# ------------------------------------------------------------
+RUN bench get-app --branch version-16 https://github.com/frappe/erpnext
+
+# ------------------------------------------------------------
+# 7️⃣ Get HRMS app (develop branch)
+# ------------------------------------------------------------
 RUN bench get-app --branch develop https://github.com/frappe/hrms
 
-# Create a new site (use --no-mariadb-socket if using remote DB)
-RUN bench new-site site1.local \
-    --admin-password admin \
-    --mariadb-root-password root \
-    --no-mariadb-socket
+# ------------------------------------------------------------
+# 8️⃣ Create site (replace password as needed)
+# ------------------------------------------------------------
+RUN bench new-site site1.local --admin-password admin --db-root-password root
 
-# Install the HRMS app on the created site
-RUN bench --site site1.local install-app hrms
+# ------------------------------------------------------------
+# 9️⃣ Install apps on site
+# ------------------------------------------------------------
+RUN bench --site site1.local install-app erpnext hrms
 
-# Expose web port
+# ------------------------------------------------------------
+# 🔟 Expose ports and set entrypoint
+# ------------------------------------------------------------
 EXPOSE 8000
-
-# Default command
 CMD ["bench", "start"]
